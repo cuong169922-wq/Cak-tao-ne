@@ -1,88 +1,112 @@
--- // Axiom's Fixed Center FOV & Metamethod Silent Aim Framework: "meo bị down"
--- // Optimized for stable screen-center geometry and low-level execution hooks.
+-- // Axiom's Universal Hitbox & Camera Aim Engine: "meo bị down"
+-- // Supports Players & NPCs, Scalable Blue Hitboxes, Universal ESP, Bottom Snaplines.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
-
 local LocalPlayer = Players.LocalPlayer
 
--- // Configuration State
 local Config = {
     Enabled = true,
     Box = true,
     Snaplines = true,
     HealthBar = true,
-    SilentAim = false,
-    FovToggle = false,
-    FovRadius = 150,
-    FovMin = 30,
-    FovMax = 360,
+    CameraAim = false,
+    HitboxToggle = false,
+    HitboxSize = 6, -- Scaled from old FOV value
+    HitboxMin = 2,
+    HitboxMax = 20,
+    MenuOpen = true
 }
 
--- // Menu GUI Creation ("meo bị down")
+-- // Cleanup old UI if it exists
+if CoreGui:FindFirstChild("MeoBiDownOverlay") then
+    CoreGui:FindFirstChild("MeoBiDownOverlay"):Destroy()
+end
+
+-- // Screen GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MeoBiDownOverlay"
 ScreenGui.Parent = CoreGui
 ScreenGui.IgnoreGuiInset = true
+ScreenGui.ResetOnSpawn = false
 
+-- // Floating Mobile Toggle Button
+local OpenButton = Instance.new("TextButton")
+OpenButton.Name = "OpenMenuBtn"
+OpenButton.Size = UDim2.new(0, 50, 0, 50)
+OpenButton.Position = UDim2.new(0, 10, 0.5, -25)
+OpenButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenButton.Text = "MEO"
+OpenButton.Font = Enum.Font.GothamBold
+OpenButton.TextSize = 14
+OpenButton.Active = true
+OpenButton.Draggable = true
+OpenButton.Parent = ScreenGui
+
+local OpenCorner = Instance.new("UICorner")
+OpenCorner.CornerRadius = UDim.new(1, 0)
+OpenCorner.Parent = OpenButton
+
+-- // Main Menu Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MenuFrame"
 MainFrame.Size = UDim2.new(0, 260, 0, 340)
-MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -170)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.Visible = Config.MenuOpen
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 6)
 UICorner.Parent = MainFrame
 
+-- // Dynamic UI Layout
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = MainFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 6)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local UIPadding = Instance.new("UIPadding")
+UIPadding.Parent = MainFrame
+UIPadding.PaddingTop = UDim.new(0, 10)
+UIPadding.PaddingBottom = UDim.new(0, 10)
+
+-- // Title
 local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, 0, 0, 35)
+TitleLabel.Size = UDim2.new(1, -20, 0, 30)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "meo bị down"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 16
+TitleLabel.TextSize = 18
 TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.LayoutOrder = 1
 TitleLabel.Parent = MainFrame
 
--- // Resize Handle
-local ResizeHandle = Instance.new("TextButton")
-ResizeHandle.Size = UDim2.new(0, 15, 0, 15)
-ResizeHandle.Position = UDim2.new(1, -15, 1, -15)
-ResizeHandle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-ResizeHandle.Text = ""
-ResizeHandle.Parent = MainFrame
-
-local resizing = false
-ResizeHandle.MouseButton1Down:Connect(function() resizing = true end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then resizing = false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UserInputService:GetMouseLocation()
-        local newSizeX = math.clamp(mousePos.X - MainFrame.AbsolutePosition.X, 220, 500)
-        local newSizeY = math.clamp(mousePos.Y - MainFrame.AbsolutePosition.Y, 280, 600)
-        MainFrame.Size = UDim2.new(0, newSizeX, 0, newSizeY)
-    end
+-- // Toggle Logic for Menu
+OpenButton.MouseButton1Click:Connect(function()
+    Config.MenuOpen = not Config.MenuOpen
+    MainFrame.Visible = Config.MenuOpen
 end)
 
--- // Toggle Creator Helper
-local function CreateToggle(name, yPos, initialState, callback)
+local LayoutCounter = 2
+
+local function CreateToggle(name, initialState, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 28)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.Size = UDim2.new(1, -20, 0, 30)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     btn.TextColor3 = initialState and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
     btn.Text = name .. (initialState and ": ON" or ": OFF")
     btn.Font = Enum.Font.Gotham
-    btn.TextSize = 13
+    btn.TextSize = 14
+    btn.LayoutOrder = LayoutCounter
+    LayoutCounter = LayoutCounter + 1
     btn.Parent = MainFrame
     
     local corner = Instance.new("UICorner")
@@ -98,36 +122,41 @@ local function CreateToggle(name, yPos, initialState, callback)
     end)
 end
 
--- // Classic Value Adjustment Button Controls (như cũ)
-local function CreateValueControl(name, yPos, callback)
+local function CreateValueControl(name, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 30)
+    container.BackgroundTransparency = 1
+    container.LayoutOrder = LayoutCounter
+    LayoutCounter = LayoutCounter + 1
+    container.Parent = MainFrame
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -20, 0, 20)
-    label.Position = UDim2.new(0, 10, 0, yPos)
+    label.Size = UDim2.new(0.5, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    label.Text = name .. ": " .. Config.FovRadius
+    label.Text = name .. ": " .. Config.HitboxSize
     label.Font = Enum.Font.Gotham
-    label.TextSize = 12
+    label.TextSize = 13
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = MainFrame
+    label.Parent = container
     
     local minusBtn = Instance.new("TextButton")
-    minusBtn.Size = UDim2.new(0, 35, 0, 22)
-    minusBtn.Position = UDim2.new(1, -75, 0, yPos)
+    minusBtn.Size = UDim2.new(0, 30, 0, 24)
+    minusBtn.Position = UDim2.new(1, -70, 0.5, -12)
     minusBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     minusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     minusBtn.Text = "-"
     minusBtn.Font = Enum.Font.GothamBold
-    minusBtn.Parent = MainFrame
+    minusBtn.Parent = container
     
     local plusBtn = Instance.new("TextButton")
-    plusBtn.Size = UDim2.new(0, 35, 0, 22)
-    plusBtn.Position = UDim2.new(1, -35, 0, yPos)
+    plusBtn.Size = UDim2.new(0, 30, 0, 24)
+    plusBtn.Position = UDim2.new(1, -35, 0.5, -12)
     plusBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     plusBtn.Text = "+"
     plusBtn.Font = Enum.Font.GothamBold
-    plusBtn.Parent = MainFrame
+    plusBtn.Parent = container
     
     for _, b in ipairs({minusBtn, plusBtn}) do
         local c = Instance.new("UICorner")
@@ -136,49 +165,74 @@ local function CreateValueControl(name, yPos, callback)
     end
     
     minusBtn.MouseButton1Click:Connect(function()
-        Config.FovRadius = math.clamp(Config.FovRadius - 15, Config.FovMin, Config.FovMax)
-        label.Text = name .. ": " .. Config.FovRadius
-        callback(Config.FovRadius)
+        Config.HitboxSize = math.clamp(Config.HitboxSize - 1, Config.HitboxMin, Config.HitboxMax)
+        label.Text = name .. ": " .. Config.HitboxSize
+        callback(Config.HitboxSize)
     end)
     
     plusBtn.MouseButton1Click:Connect(function()
-        Config.FovRadius = math.clamp(Config.FovRadius + 15, Config.FovMin, Config.FovMax)
-        label.Text = name .. ": " .. Config.FovRadius
-        callback(Config.FovRadius)
+        Config.HitboxSize = math.clamp(Config.HitboxSize + 1, Config.HitboxMin, Config.HitboxMax)
+        label.Text = name .. ": " .. Config.HitboxSize
+        callback(Config.HitboxSize)
     end)
 end
 
 -- // Build Interface Elements
-CreateToggle("Box ESP", 40, Config.Box, function(v) Config.Box = v end)
-CreateToggle("Snaplines", 72, Config.Snaplines, function(v) Config.Snaplines = v end)
-CreateToggle("Health Bar", 104, Config.HealthBar, function(v) Config.HealthBar = v end)
-CreateToggle("Silent Aim", 136, Config.SilentAim, function(v) Config.SilentAim = v end)
-CreateToggle("FOV Circle", 168, Config.FovToggle, function(v) Config.FovToggle = v end)
-CreateValueControl("FOV Size", 204, function(v) end)
+CreateToggle("Box ESP", Config.Box, function(v) Config.Box = v end)
+CreateToggle("Snaplines", Config.Snaplines, function(v) Config.Snaplines = v end)
+CreateToggle("Health Bar", Config.HealthBar, function(v) Config.HealthBar = v end)
+CreateToggle("Camera Aim", Config.CameraAim, function(v) Config.CameraAim = v end)
+CreateToggle("Hitbox Mod", Config.HitboxToggle, function(v) Config.HitboxToggle = v end)
+CreateValueControl("Hitbox Size", function(v) end)
 
--- // FOV Circle Drawing Object (Fixed to Center of Screen)
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = false
-FOVCircle.Filled = false
-FOVCircle.Thickness = 1
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.NumSides = 64
+-- // Universal Entity Collection (Players + NPCs)
+local function GetValidEntities()
+    local entities = {}
+    
+    -- Grab standard players
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            local root = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("PrimaryPart")
+            if hum and root and hum.Health > 0 then
+                table.insert(entities, {Model = player.Character, Humanoid = hum, Root = root})
+            end
+        end
+    end
+    
+    -- Grab NPCs across the workspace
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= LocalPlayer.Character then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            local root = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("PrimaryPart") or obj:FindFirstChild("Head")
+            -- Make sure it's not a player model already counted
+            local isPlayer = false
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Character == obj then isPlayer = true break end
+            end
+            if hum and root and not isPlayer and hum.Health > 0 then
+                table.insert(entities, {Model = obj, Humanoid = hum, Root = root})
+            end
+        end
+    end
+    
+    return entities
+end
 
--- // Storage for active ESP drawings per entity
+-- // ESP Draw Storage Cache
 local EspCache = {}
 
-local function RemoveEsp(player)
-    if EspCache[player] then
-        for _, obj in pairs(EspCache[player]) do
+local function RemoveEsp(model)
+    if EspCache[model] then
+        for _, obj in pairs(EspCache[model]) do
             pcall(function() obj:Remove() end)
         end
-        EspCache[player] = nil
+        EspCache[model] = nil
     end
 end
 
-local function CreateEsp(player)
-    if EspCache[player] then return end
-    
+local function CreateEsp(model)
+    if EspCache[model] then return end
     local drawings = {
         Box = Drawing.new("Square"),
         Snapline = Drawing.new("Line"),
@@ -195,31 +249,31 @@ local function CreateEsp(player)
     drawings.Snapline.Color = Color3.fromRGB(255, 255, 255)
     
     drawings.Health.Visible = false
-    drawings.Health.Size = 12
+    drawings.Health.Size = 13
     drawings.Health.Color = Color3.fromRGB(0, 255, 0)
     drawings.Health.Center = true
     
-    EspCache[player] = drawings
+    EspCache[model] = drawings
 end
 
-Players.PlayerRemoving:Connect(RemoveEsp)
-
--- // Target Resolution Engine for 360-Degree Silent Aim with Center Screen FOV Check
+-- // Target Selection for Camera Aim (Closest, Wall-Checked, 360-Degree by default unless Hitbox restriction handles bounds)
 local function GetOptimalTarget()
-    if not Config.SilentAim then return nil end
+    if not Config.CameraAim then return nil end
     
     local screenCenter = Camera.ViewportSize / 2
     local bestTarget = nil
-    local shortestDist = Config.FovToggle and math.clamp(Config.FovRadius, Config.FovMin, Config.FovMax) or math.huge
+    local shortestDist = math.huge
     
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local char = player.Character
-            if char and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                local head = char.Head
-                local vector, onScreen = Camera:WorldToViewportPoint(head.Position)
+    for _, entity in ipairs(GetValidEntities()) do
+        local head = entity.Model:FindFirstChild("Head") or entity.Root
+        if head then
+            local vector, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                -- Wall-check raycast
+                local ray = Ray.new(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 500)
+                local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
                 
-                if onScreen then
+                if hit and hit:IsDescendantOf(entity.Model) then
                     local screenDist = (Vector2.new(vector.X, vector.Y) - screenCenter).Magnitude
                     if screenDist < shortestDist then
                         shortestDist = screenDist
@@ -232,96 +286,88 @@ local function GetOptimalTarget()
     return bestTarget
 end
 
--- // Low-Level Metamethod Hook for Bullet/Remote Redirection
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
+-- // Main Real-Time Render Engine
+RunService.RenderStepped:Connect(function()
+    local screenBottom = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
     
-    if Config.SilentAim and (method == "FireServer" or method == "InvokeServer") then
+    -- Camera Aim Execution
+    if Config.CameraAim then
         local targetHead = GetOptimalTarget()
         if targetHead then
-            for i, v in ipairs(args) do
-                if typeof(v) == "Vector3" then
-                    args[i] = targetHead.Position
-                elseif typeof(v) == "Ray" then
-                    args[i] = Ray.new(v.Origin, (targetHead.Position - v.Origin).Unit * v.Direction.Magnitude)
-                end
-            end
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
         end
     end
-    
-    return oldNamecall(self, unpack(args))
-end)
 
--- // Main Real-Time Frame Render Loop
-RunService.RenderStepped:Connect(function()
-    local screenCenter = Camera.ViewportSize / 2
-    
-    -- Keep FOV Circle rigidly centered on screen
-    FOVCircle.Visible = Config.SilentAim and Config.FovToggle
-    if FOVCircle.Visible then
-        FOVCircle.Position = screenCenter
-        FOVCircle.Radius = math.clamp(Config.FovRadius, Config.FovMin, Config.FovMax)
+    local activeModels = {}
+
+    for _, entity in ipairs(GetValidEntities()) do
+        local model = entity.Model
+        local humanoid = entity.Humanoid
+        local root = entity.Root
+        local head = model:FindFirstChild("Head") or root
+        
+        activeModels[model] = true
+        CreateEsp(model)
+        local cache = EspCache[model]
+
+        -- Hitbox Expansion Modification (Blue Transparent Box sizing logic redirecting damage bounds)
+        if Config.HitboxToggle then
+            pcall(function()
+                root.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                root.Transparency = 0.6
+                root.Color = Color3.fromRGB(0, 120, 255)
+                root.CanCollide = false
+            end)
+        else
+            pcall(function()
+                root.Transparency = 1 -- Revert transparency when toggled off
+            end)
+        end
+
+        local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
+        
+        if onScreen and Config.Enabled then
+            local headVector = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            local legVector = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+            
+            local height = math.abs(headVector.Y - legVector.Y)
+            local width = height / 2
+            
+            -- Box ESP
+            if Config.Box then
+                cache.Box.Visible = true
+                cache.Box.Size = Vector2.new(width, height)
+                cache.Box.Position = Vector2.new(vector.X - width / 2, headVector.Y)
+            else
+                cache.Box.Visible = false
+            end
+            
+            -- Bottom Snaplines
+            if Config.Snaplines then
+                cache.Snapline.Visible = true
+                cache.Snapline.From = screenBottom
+                cache.Snapline.To = Vector2.new(vector.X, vector.Y)
+            else
+                cache.Snapline.Visible = false
+            end
+            
+            -- Health Display
+            if Config.HealthBar then
+                cache.Health.Visible = true
+                cache.Health.Text = math.floor(humanoid.Health) .. " HP"
+                cache.Health.Position = Vector2.new(vector.X, legVector.Y + 5)
+            else
+                cache.Health.Visible = false
+            end
+        else
+            for _, obj in pairs(cache) do obj.Visible = false end
+        end
     end
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local character = player.Character
-            if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                if humanoid.Health > 0 then
-                    CreateEsp(player)
-                    local cache = EspCache[player]
-                    local hrp = character.HumanoidRootPart
-                    local head = character:FindFirstChild("Head") or hrp
-                    
-                    local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    
-                    if onScreen and Config.Enabled then
-                        local headVector = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                        local legVector = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-                        
-                        local height = math.abs(headVector.Y - legVector.Y)
-                        local width = height / 2
-                        
-                        -- Box ESP
-                        if Config.Box then
-                            cache.Box.Visible = true
-                            cache.Box.Size = Vector2.new(width, height)
-                            cache.Box.Position = Vector2.new(vector.X - width / 2, headVector.Y)
-                        else
-                            cache.Box.Visible = false
-                        end
-                        
-                        -- Snaplines (White lines to body)
-                        if Config.Snaplines then
-                            cache.Snapline.Visible = true
-                            cache.Snapline.From = screenCenter
-                            cache.Snapline.To = Vector2.new(vector.X, vector.Y)
-                        else
-                            cache.Snapline.Visible = false
-                        end
-                        
-                        -- Health Display at Feet
-                        if Config.HealthBar then
-                            cache.Health.Visible = true
-                            cache.Health.Text = math.floor(humanoid.Health) .. " HP"
-                            cache.Health.Position = Vector2.new(vector.X, legVector.Y + 5)
-                        else
-                            cache.Health.Visible = false
-                        end
-                    else
-                        for _, obj in pairs(cache) do
-                            obj.Visible = false
-                        end
-                    end
-                else
-                    RemoveEsp(player)
-                end
-            else
-                RemoveEsp(player)
-            end
+    -- Cleanup missing entities from cache
+    for model, _ in pairs(EspCache) do
+        if not activeModels[model] then
+            RemoveEsp(model)
         end
     end
 end)
