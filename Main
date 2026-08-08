@@ -1,15 +1,13 @@
--- // Axiom's High-Performance Overlay Framework: "meo bị down" (Delta Mobile Optimized)
+-- // Axiom's Decoupled ESP & 360-Degree Silent Aim Framework: "meo bị down"
+-- // Optimized for modular toggles and zero-lag real-time execution.
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
-local ProtectedGui = (gethui and gethui()) or game:GetService("CoreGui")
-
--- // Safe Drawing Library Check for Mobile/Delta Environments
-local DrawingLib = Drawing or (syn and syn.drawing)
-assert(DrawingLib, "Drawing library is not supported on this executor, boss man!")
 
 -- // Configuration State
 local Config = {
@@ -17,7 +15,8 @@ local Config = {
     Box = true,
     Snaplines = true,
     HealthBar = true,
-    SilentAim = true,
+    SilentAim = false,
+    FovToggle = false,
     FovRadius = 150,
     FovMin = 30,
     FovMax = 360,
@@ -26,12 +25,12 @@ local Config = {
 -- // Menu GUI Creation ("meo bị down")
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MeoBiDownOverlay"
-ScreenGui.Parent = ProtectedGui
+ScreenGui.Parent = CoreGui
 ScreenGui.IgnoreGuiInset = true
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MenuFrame"
-MainFrame.Size = UDim2.new(0, 250, 0, 370)
+MainFrame.Size = UDim2.new(0, 260, 0, 360)
 MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
@@ -68,50 +67,20 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
         local mousePos = UserInputService:GetMouseLocation()
-        local newSizeX = math.clamp(mousePos.X - MainFrame.AbsolutePosition.X, 200, 500)
-        local newSizeY = math.clamp(mousePos.Y - MainFrame.AbsolutePosition.Y, 250, 600)
+        local newSizeX = math.clamp(mousePos.X - MainFrame.AbsolutePosition.X, 220, 500)
+        local newSizeY = math.clamp(mousePos.Y - MainFrame.AbsolutePosition.Y, 300, 600)
         MainFrame.Size = UDim2.new(0, newSizeX, 0, newSizeY)
     end
 end)
 
--- // Menu Visibility Toggle
-local menuVisible = true
-local function ToggleMenu()
-    menuVisible = not menuVisible
-    MainFrame.Visible = menuVisible
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        ToggleMenu()
-    end
-end)
-
--- // Floating Toggle Button on Screen
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 100, 0, 30)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "Toggle UI"
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.TextSize = 12
-ToggleButton.Parent = ScreenGui
-
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 4)
-toggleCorner.Parent = ToggleButton
-
-ToggleButton.MouseButton1Click:Connect(ToggleMenu)
-
 -- // Toggle Creator Helper
-local function CreateToggle(name, yPos, callback)
+local function CreateToggle(name, yPos, initialState, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Size = UDim2.new(1, -20, 0, 28)
     btn.Position = UDim2.new(0, 10, 0, yPos)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    btn.TextColor3 = Color3.fromRGB(100, 255, 100)
-    btn.Text = name .. ": ON"
+    btn.TextColor3 = initialState and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+    btn.Text = name .. (initialState and ": ON" or ": OFF")
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 13
     btn.Parent = MainFrame
@@ -120,7 +89,7 @@ local function CreateToggle(name, yPos, callback)
     corner.CornerRadius = UDim.new(0, 4)
     corner.Parent = btn
     
-    local state = true
+    local state = initialState
     btn.MouseButton1Click:Connect(function()
         state = not state
         btn.Text = name .. (state and ": ON" or ": OFF")
@@ -129,59 +98,74 @@ local function CreateToggle(name, yPos, callback)
     end)
 end
 
-CreateToggle("Box ESP", 45, function(v) Config.Box = v end)
-CreateToggle("Snaplines", 80, function(v) Config.Snaplines = v end)
-CreateToggle("Health Bar", 115, function(v) Config.HealthBar = v end)
-CreateToggle("Silent Aim", 150, function(v) Config.SilentAim = v end)
-
--- // FOV Adjustment Controls
-local FovLabel = Instance.new("TextLabel")
-FovLabel.Size = UDim2.new(1, -20, 0, 25)
-FovLabel.Position = UDim2.new(0, 10, 0, 185)
-FovLabel.BackgroundTransparency = 1
-FovLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-FovLabel.Text = "FOV Radius: " .. Config.FovRadius
-FovLabel.Font = Enum.Font.Gotham
-FovLabel.TextSize = 13
-FovLabel.Parent = MainFrame
-
-local function CreateButton(text, xPos, yPos, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.5, -13, 0, 25)
-    btn.Position = UDim2.new(xPos, 0, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Text = text
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.Parent = MainFrame
+-- // Slider Creator Helper for FOV Scaling
+local function CreateSlider(name, yPos, min, max, default, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 18)
+    label.Position = UDim2.new(0, 10, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.Text = name .. ": " .. default
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = MainFrame
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = btn
+    local sliderBar = Instance.new("TextButton")
+    sliderBar.Size = UDim2.new(1, -20, 0, 10)
+    sliderBar.Position = UDim2.new(0, 10, 0, yPos + 18)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    sliderBar.Text = ""
+    sliderBar.Parent = MainFrame
     
-    btn.MouseButton1Click:Connect(callback)
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 3)
+    barCorner.Parent = sliderBar
+    
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+    fill.BorderSizePixel = 0
+    fill.Parent = sliderBar
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 3)
+    fillCorner.Parent = fill
+    
+    local sliding = false
+    sliderBar.MouseButton1Down:Connect(function() sliding = true end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mouseLoc = UserInputService:GetMouseLocation()
+            local relX = math.clamp(mouseLoc.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+            local val = math.floor(min + (relX / sliderBar.AbsoluteSize.X) * (max - min))
+            fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+            label.Text = name .. ": " .. val
+            callback(val)
+        end
+    end)
 end
 
-CreateButton("FOV -", 0, 215, function()
-    Config.FovRadius = math.clamp(Config.FovRadius - 10, Config.FovMin, Config.FovMax)
-    FovLabel.Text = "FOV Radius: " .. Config.FovRadius
-end)
+-- // Build Controls
+CreateToggle("Box ESP", 40, Config.Box, function(v) Config.Box = v end)
+CreateToggle("Snaplines", 72, Config.Snaplines, function(v) Config.Snaplines = v end)
+CreateToggle("Health Bar", 104, Config.HealthBar, function(v) Config.HealthBar = v end)
+CreateToggle("Silent Aim", 136, Config.SilentAim, function(v) Config.SilentAim = v end)
+CreateToggle("FOV Circle", 168, Config.FovToggle, function(v) Config.FovToggle = v end)
+CreateSlider("FOV Size", 204, Config.FovMin, Config.FovMax, Config.FovRadius, function(v) Config.FovRadius = v end)
 
-CreateButton("FOV +", 0.5, 215, function()
-    Config.FovRadius = math.clamp(Config.FovRadius + 10, Config.FovMin, Config.FovMax)
-    FovLabel.Text = "FOV Radius: " .. Config.FovRadius
-end)
-
--- // FOV Circle Drawing
-local FOVCircle = DrawingLib.new("Circle")
-FOVCircle.Visible = true
+-- // FOV Circle Drawing Object
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
 FOVCircle.Filled = false
 FOVCircle.Thickness = 1
 FOVCircle.Color = Color3.fromRGB(255, 255, 255)
 FOVCircle.NumSides = 64
 
--- // Storage for active drawings per character
+-- // Storage for active ESP drawings per entity
 local EspCache = {}
 
 local function RemoveEsp(player)
@@ -197,11 +181,9 @@ local function CreateEsp(player)
     if EspCache[player] then return end
     
     local drawings = {
-        Box = DrawingLib.new("Square"),
-        Snapline = DrawingLib.new("Line"),
-        Health = DrawingLib.new("Text"),
-        HealthBg = DrawingLib.new("Square"),
-        HealthFill = DrawingLib.new("Square")
+        Box = Drawing.new("Square"),
+        Snapline = Drawing.new("Line"),
+        Health = Drawing.new("Text")
     }
     
     drawings.Box.Visible = false
@@ -218,29 +200,50 @@ local function CreateEsp(player)
     drawings.Health.Color = Color3.fromRGB(0, 255, 0)
     drawings.Health.Center = true
     
-    drawings.HealthBg.Visible = false
-    drawings.HealthBg.Filled = true
-    drawings.HealthBg.Color = Color3.fromRGB(0, 0, 0)
-    
-    drawings.HealthFill.Visible = false
-    drawings.HealthFill.Filled = true
-    drawings.HealthFill.Color = Color3.fromRGB(0, 255, 0)
-    
     EspCache[player] = drawings
 end
 
 Players.PlayerRemoving:Connect(RemoveEsp)
 
--- // Main High-Performance Render Loop
-RunService.RenderStepped:Connect(function()
-    local viewportSize = Camera.ViewportSize
-    FOVCircle.Position = viewportSize / 2
-    FOVCircle.Radius = math.clamp(Config.FovRadius, Config.FovMin, Config.FovMax)
-    FOVCircle.Visible = Config.SilentAim
+-- // Hook function for 360-degree silent aim redirection
+local function GetBestTarget()
+    if not Config.SilentAim then return nil end
+    
+    local mousePos = UserInputService:GetMouseLocation()
+    local bestTarget = nil
+    -- If FOV toggle is ON, use FOV radius constraint; if OFF, utilize full 360-degree workspace tracking bounds
+    local shortestDist = Config.FovToggle and math.clamp(Config.FovRadius, Config.FovMin, Config.FovMax) or math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+                local head = char.Head
+                local vector, onScreen = Camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    local screenDist = (Vector2.new(vector.X, vector.Y) - mousePos).Magnitude
+                    if screenDist < shortestDist then
+                        shortestDist = screenDist
+                        bestTarget = head
+                    end
+                end
+            end
+        end
+    end
+    return bestTarget
+end
 
-    local centerScreen = viewportSize / 2
-    local closestTarget = nil
-    local shortestDist = Config.FovRadius
+-- // Main Real-Time Frame Render Loop
+RunService.RenderStepped:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    -- Update FOV Circle visibility and constraints strictly based on individual toggles
+    FOVCircle.Visible = Config.SilentAim and Config.FovToggle
+    if FOVCircle.Visible then
+        FOVCircle.Position = mousePos
+        FOVCircle.Radius = math.clamp(Config.FovRadius, Config.FovMin, Config.FovMax)
+    end
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -262,7 +265,7 @@ RunService.RenderStepped:Connect(function()
                         local height = math.abs(headVector.Y - legVector.Y)
                         local width = height / 2
                         
-                        -- Box Rendering
+                        -- Box ESP
                         if Config.Box then
                             cache.Box.Visible = true
                             cache.Box.Size = Vector2.new(width, height)
@@ -271,31 +274,22 @@ RunService.RenderStepped:Connect(function()
                             cache.Box.Visible = false
                         end
                         
-                        -- Snaplines
+                        -- Snaplines (White lines pointing to body)
                         if Config.Snaplines then
                             cache.Snapline.Visible = true
-                            cache.Snapline.From = Vector2.new(viewportSize.X / 2, viewportSize.Y)
+                            cache.Snapline.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                             cache.Snapline.To = Vector2.new(vector.X, vector.Y)
                         else
                             cache.Snapline.Visible = false
                         end
                         
-                        -- Health at feet
+                        -- Health Display at Feet
                         if Config.HealthBar then
                             cache.Health.Visible = true
                             cache.Health.Text = math.floor(humanoid.Health) .. " HP"
                             cache.Health.Position = Vector2.new(vector.X, legVector.Y + 5)
                         else
                             cache.Health.Visible = false
-                        end
-                        
-                        -- Silent Aim Calculation
-                        if Config.SilentAim then
-                            local screenDist = (Vector2.new(headVector.X, headVector.Y) - centerScreen).Magnitude
-                            if screenDist < shortestDist then
-                                shortestDist = screenDist
-                                closestTarget = head
-                            end
                         end
                     else
                         for _, obj in pairs(cache) do
